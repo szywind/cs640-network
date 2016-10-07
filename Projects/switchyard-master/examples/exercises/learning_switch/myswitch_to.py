@@ -15,7 +15,7 @@ def switchy_main(net):
     my_interfaces = net.interfaces()
     mymacs = [intf.ethaddr for intf in my_interfaces]
 
-    # broadCastAddr = EthAddr("ff:ff:ff:ff:ff:ff")
+    broadCastAddr = EthAddr("ff:ff:ff:ff:ff:ff")
     timeRefresh = 10
 
     forwardingTable = {}; # {mac: [port, time]}
@@ -35,7 +35,8 @@ def switchy_main(net):
 
         recv_time = time.time()
 
-        forwardingTable[src_addr] = [input_port, recv_time]
+        if src_addr != broadCastAddr:
+            forwardingTable[src_addr] = [input_port, recv_time]
 
         if dst_addr in mymacs:
             log_debug ("Packet intended for me")
