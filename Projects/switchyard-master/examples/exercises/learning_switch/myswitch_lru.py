@@ -3,7 +3,9 @@
 '''
 Ethernet learning switch in Python: Project 1.
 
-Remove an entry from the forwarding table after 10 seconds have elapsed
+Remove the least recently used (LRU) entry from the forwarding table. For this functionality assume that
+your table can only hold 5 entries at a time. If a new entry comes and your table is full, you will remove the entry
+that has not been matched with a Ethernet frame destination address for the longest time.
 '''
 from switchyard.lib.address import *
 from switchyard.lib.packet import *

@@ -37,9 +37,9 @@ def switch_tests():
     s.add_interface('eth4', '10:00:00:00:00:05')
     s.add_interface('eth5', '10:00:00:00:00:06')
 
-    # test_switch_to(s)
+    test_switch_to(s)
     # test_switch_lru(s)
-    test_switch_traffic(s)
+    # test_switch_traffic(s)
     return s
 
 def test_switch_to(s):
