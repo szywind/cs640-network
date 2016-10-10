@@ -36,11 +36,7 @@ def switchy_main(net):
         src_addr = packet[0].src
         dst_addr = packet[0].dst
 
-        # update # of times of destination
-        if dst_addr in dstCount:
-            dstCount[dst_addr] += 1
-        else:
-            dstCount[dst_addr] = 1
+
 
         # log_debug('--------------------------------------------------')
         # log_debug(dstCount)
@@ -77,6 +73,12 @@ def switchy_main(net):
                             forwardingTable[src_addr] = input_port
             else:
                 forwardingTable[src_addr] = input_port # !!! update the input_port for the address
+
+        # update # of times of destination
+        if dst_addr in dstCount:
+            dstCount[dst_addr] += 1
+        else:
+            dstCount[dst_addr] = 1
 
         if dst_addr in mymacs:
             log_debug ("Packet intended for me")
