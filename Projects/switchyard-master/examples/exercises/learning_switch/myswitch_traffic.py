@@ -54,31 +54,35 @@ def switchy_main(net):
                     min_traffic = float("Inf")
                     min_addr = -1
                     for addr in forwardingTable:
-                        log_debug(addr)
-                        log_debug(addr in dstCount)
                         if addr not in dstCount:
-                            del forwardingTable[addr]
-                            forwardingTable[src_addr] = input_port
+                            min_addr = addr
                             break
                         else:
                             if dstCount[addr] < min_traffic:
                                 min_traffic = dstCount[addr]
                                 min_addr = addr
-                    if src_addr not in dstCount:
-                        pass
-                    else:
-                        # remove the least traffic port
-                        if dstCount[src_addr] >= min_traffic:
-                            del forwardingTable[min_addr]
-                            forwardingTable[src_addr] = input_port
+                    # if src_addr not in dstCount:
+                    #     pass
+                    # else:
+                    #     # remove the least traffic port
+                    #     if dstCount[src_addr] >= min_traffic:
+                    #         del forwardingTable[min_addr]
+                    #         forwardingTable[src_addr] = input_port
+
+                    # remove the least traffic port
+                    del forwardingTable[min_addr]
+                    if min_addr in dstCount:
+                        del dstCount[min_addr]
+                    forwardingTable[src_addr] = input_port
             else:
                 forwardingTable[src_addr] = input_port # !!! update the input_port for the address
 
         # update # of times of destination
-        if dst_addr in dstCount:
-            dstCount[dst_addr] += 1
-        else:
-            dstCount[dst_addr] = 1
+        if dst_addr in forwardingTable:
+            if dst_addr in dstCount:
+                dstCount[dst_addr] += 1
+            else:
+                dstCount[dst_addr] = 1
 
         if dst_addr in mymacs:
             log_debug ("Packet intended for me")

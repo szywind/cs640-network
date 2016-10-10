@@ -38,15 +38,21 @@ def switchy_main(net):
 
 
         if src_addr != broadCastAddr:
-            forwardingTable[src_addr] = [id, input_port]
-            id += 1
-            if len(forwardingTable) > size:
-                del forwardingTable[min(forwardingTable.items(), key=operator.itemgetter(1))[0]]
+            if src_addr in forwardingTable:
+                # just change input source, not update LRU id
+                forwardingTable[src_addr][1] = input_port
+            else:
+                forwardingTable[src_addr] = [id, input_port]
+                id += 1
+                if len(forwardingTable) > size:
+                    del forwardingTable[min(forwardingTable.items(), key=operator.itemgetter(1))[0]]
 
 
         if dst_addr in mymacs:
             log_debug ("Packet intended for me")
         elif dst_addr in forwardingTable:
+            forwardingTable[dst_addr][0] = id
+            id += 1
             net.send_packet(forwardingTable[dst_addr][-1], packet)
         else:
             for intf in my_interfaces:
