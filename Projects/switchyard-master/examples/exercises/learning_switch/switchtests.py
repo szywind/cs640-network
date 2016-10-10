@@ -1,5 +1,8 @@
 #!/usr/bin/env python
+'''
+Usage  ../../../srpy.py -t -s switchtests.py myswitch_to.py
 
+'''
 import sys
 from switchyard.lib.address import *
 from switchyard.lib.packet import *

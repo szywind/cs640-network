@@ -40,8 +40,11 @@ def switchy_main(net):
 
         if dst_addr in mymacs:
             log_debug ("Packet intended for me")
-        elif dst_addr in forwardingTable and recv_time - forwardingTable[dst_addr][1] < timeRefresh:
-            net.send_packet(forwardingTable[dst_addr][0], packet)
+        elif dst_addr in forwardingTable:
+            if recv_time - forwardingTable[dst_addr][1] < timeRefresh:
+                net.send_packet(forwardingTable[dst_addr][0], packet)
+            else:
+                del forwardingTable[dst_addr]
         else:
             for intf in my_interfaces:
                 if input_port != intf.name:
