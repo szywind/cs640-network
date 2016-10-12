@@ -20,8 +20,7 @@ def switchy_main(net):
     broadCastAddr = EthAddr("ff:ff:ff:ff:ff:ff")
     size = 5
 
-    dstCount = {}
-    forwardingTable = {}; # {mac: port}
+    forwardingTable = {}; # {mac: [traffic, port]}
 
     while True:
         try:
@@ -37,59 +36,28 @@ def switchy_main(net):
         dst_addr = packet[0].dst
 
 
-
-        # log_debug('--------------------------------------------------')
-        # log_debug(dstCount)
-        # log_debug('--------------------------------------------------')
-        # log_debug(forwardingTable)
-        # log_debug('--------------------------------------------------')
-
-
         if src_addr != broadCastAddr:
-            if src_addr not in forwardingTable:
+            if src_addr in forwardingTable:
+                # !!! update the port for the src_address if necessary
+                forwardingTable[src_addr][1] = input_port
+            else:
                 if len(forwardingTable) < size:
-                    forwardingTable[src_addr] = input_port
+                    forwardingTable[src_addr] = [0, input_port]
                 else:
-                    # check whether to remove one entry
-                    min_traffic = float("Inf")
-                    min_addr = -1
-                    for addr in forwardingTable:
-                        if addr not in dstCount:
-                            min_addr = addr
-                            break
-                        else:
-                            if dstCount[addr] < min_traffic:
-                                min_traffic = dstCount[addr]
-                                min_addr = addr
-                    # if src_addr not in dstCount:
-                    #     pass
-                    # else:
-                    #     # remove the least traffic port
-                    #     if dstCount[src_addr] >= min_traffic:
-                    #         del forwardingTable[min_addr]
-                    #         forwardingTable[src_addr] = input_port
+                    # remove one entry
+                    del forwardingTable[min(forwardingTable.items(), key=operator.itemgetter(1))[0]]
+                    forwardingTable[src_addr] = [0, input_port]
 
-                    # remove the least traffic port
-                    del forwardingTable[min_addr]
-                    if min_addr in dstCount:
-                        del dstCount[min_addr]
-                    forwardingTable[src_addr] = input_port
-            else:
-                forwardingTable[src_addr] = input_port # !!! update the input_port for the address
-
-        # update # of times of destination
+        # update traffic volume
         if dst_addr in forwardingTable:
-            if dst_addr in dstCount:
-                dstCount[dst_addr] += 1
-            else:
-                dstCount[dst_addr] = 1
+            forwardingTable[dst_addr][0] += 1
 
         if dst_addr in mymacs:
             log_debug ("Packet intended for me")
 
         else:
             if dst_addr in forwardingTable:
-                net.send_packet(forwardingTable[dst_addr], packet)
+                net.send_packet(forwardingTable[dst_addr][-1], packet)
             else:
                 for intf in my_interfaces:
                     if input_port != intf.name:

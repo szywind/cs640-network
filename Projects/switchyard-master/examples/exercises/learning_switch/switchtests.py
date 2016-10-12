@@ -39,10 +39,11 @@ def switch_tests():
     s.add_interface('eth3', '10:00:00:00:00:04')
     s.add_interface('eth4', '10:00:00:00:00:05')
     s.add_interface('eth5', '10:00:00:00:00:06')
+    s.add_interface('eth6', '10:00:00:00:00:07')
 
-    # test_switch_to(s)
+    test_switch_to(s)
     # test_switch_lru(s)
-    test_switch_traffic(s)
+    # test_switch_traffic(s)
     return s
 
 def test_switch_to(s):
@@ -56,13 +57,13 @@ def test_switch_lru(s):
     # LRU
     case_1(s)
     case_3(s)
-    case_4(s)
+    # case_4(s)
+    case_6(s)
 
 def test_switch_traffic(s):
     # Least Traffic Removal
     case_1(s)
-    for i in range(1):
-        case_3(s)
+    case_3(s)
     case_5(s)
 
 
@@ -73,13 +74,13 @@ def case_1(s):
     testpkt = mk_pkt("ff:ff:ff:ff:ff:ff", "20:00:00:00:00:01")
     s.expect(PacketInputEvent("eth0", testpkt, display=Ethernet),
              "An Ethernet frame with a broadcast destination address should arrive on eth0")
-    s.expect(PacketOutputEvent("eth1", testpkt, "eth2", testpkt, "eth3", testpkt, "eth4", testpkt, "eth5", testpkt, display=Ethernet),
+    s.expect(PacketOutputEvent("eth1", testpkt, "eth2", testpkt, "eth3", testpkt, "eth4", testpkt, "eth5", testpkt, "eth6", testpkt, display=Ethernet),
              "The Ethernet frame with a broadcast destination address should be forwarded out other ports")
 
     testpkt = mk_pkt("20:00:00:00:00:01", "ff:ff:ff:ff:ff:ff")
     s.expect(PacketInputEvent("eth1", testpkt, display=Ethernet),
              "An Ethernet frame with a broadcast destination address should arrive on eth1")
-    s.expect(PacketOutputEvent("eth0", testpkt, "eth2", testpkt, "eth3", testpkt, "eth4", testpkt, "eth5", testpkt, display=Ethernet),
+    s.expect(PacketOutputEvent("eth0", testpkt, "eth2", testpkt, "eth3", testpkt, "eth4", testpkt, "eth5", testpkt, "eth6", testpkt, display=Ethernet),
              "The Ethernet frame with a broadcast destination address should be forwarded out other ports")
 
 
@@ -128,7 +129,7 @@ def case_4(s):
     reqpkt = mk_pkt("20:00:00:00:00:00", "20:00:00:00:00:03")
     s.expect(PacketInputEvent("eth0", reqpkt, display=Ethernet),
              "An Ethernet frame from 20:00:00:00:00:00 to 20:00:00:00:00:03 should arrive on eth0")
-    s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, display=Ethernet),
+    s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, "eth6", reqpkt, display=Ethernet),
              "Ethernet frame destined for 20:00:00:00:00:03 should be flooded")
 
     # 1->0
@@ -170,7 +171,7 @@ def case_4(s):
     reqpkt = mk_pkt("20:00:00:00:00:01", "20:00:00:00:00:02")
     s.expect(PacketInputEvent("eth1", reqpkt, display=Ethernet),
              "An Ethernet frame from 20:00:00:00:00:01 to 20:00:00:00:00:02 should arrive on eth1")
-    s.expect(PacketOutputEvent("eth0", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, display=Ethernet),
+    s.expect(PacketOutputEvent("eth0", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, "eth6", reqpkt, display=Ethernet),
              "Ethernet frame destined for 20:00:00:00:00:02 should be flooded")
 
 
@@ -178,7 +179,7 @@ def case_4(s):
     reqpkt = mk_pkt("20:00:00:00:00:00", "20:00:00:00:00:02")
     s.expect(PacketInputEvent("eth0", reqpkt, display=Ethernet),
              "An Ethernet frame from 20:00:00:00:00:00 to 20:00:00:00:00:02 should arrive on eth0")
-    s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, display=Ethernet),
+    s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, "eth6", reqpkt, display=Ethernet),
              "Ethernet frame destined for 20:00:00:00:00:02 should be flooded")
 
 def case_5(s):
@@ -189,8 +190,7 @@ def case_5(s):
         reqpkt = mk_pkt("20:00:00:00:00:00", "20:00:00:00:00:03")
         s.expect(PacketInputEvent("eth0", reqpkt, display=Ethernet),
                  "An Ethernet frame from 20:00:00:00:00:00 to 20:00:00:00:00:03 should arrive on eth0")
-        s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt,
-                                   display=Ethernet),
+        s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, "eth6", reqpkt, display=Ethernet),
                  "Ethernet frame destined for 20:00:00:00:00:03 should be flooded")
 
     # 1->0
@@ -232,7 +232,7 @@ def case_5(s):
     reqpkt = mk_pkt("20:00:00:00:00:05", "20:00:00:00:00:04")
     s.expect(PacketInputEvent("eth5", reqpkt, display=Ethernet),
              "An Ethernet frame from 20:00:00:00:00:05 to 20:00:00:00:00:04 should arrive on eth5")
-    s.expect(PacketOutputEvent("eth0", reqpkt, "eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, display=Ethernet),
+    s.expect(PacketOutputEvent("eth0", reqpkt, "eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth6", reqpkt, display=Ethernet),
              "Ethernet frame destined for 20:00:00:00:00:04 should be flooded")
 
     # 5->3 and change port of 5 from eth5 to eth4, 4 is removed in this step
@@ -243,5 +243,58 @@ def case_5(s):
              "Ethernet frame destined for 20:00:00:00:00:03 should be sent to eth3")
 
 
+def case_6(s):
+    # test case 6: [for LRU] a frame with any unicast address that was removed from forwarding table should be learned again.
+
+    # 0->3
+    reqpkt = mk_pkt("20:00:00:00:00:00", "20:00:00:00:00:03")
+    s.expect(PacketInputEvent("eth0", reqpkt, display=Ethernet),
+             "sender: eth0")
+    s.expect(PacketOutputEvent("eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth5", reqpkt, "eth6",
+                               reqpkt, display=Ethernet),
+             "receiver: flooding")
+
+    # 1->0
+    reqpkt = mk_pkt("20:00:00:00:00:01", "20:00:00:00:00:00")
+    s.expect(PacketInputEvent("eth1", reqpkt, display=Ethernet),
+             "sender: eth1")
+    s.expect(PacketOutputEvent("eth0", reqpkt, display=Ethernet),
+             "receiver: eth0")
+
+    # 2->0
+    reqpkt = mk_pkt("20:00:00:00:00:02", "20:00:00:00:00:00")
+    s.expect(PacketInputEvent("eth2", reqpkt, display=Ethernet),
+             "sender: eth2")
+    s.expect(PacketOutputEvent("eth0", reqpkt, display=Ethernet),
+             "receiver: eth0")
+
+    # 3->0
+    reqpkt = mk_pkt("20:00:00:00:00:03", "20:00:00:00:00:00")
+    s.expect(PacketInputEvent("eth3", reqpkt, display=Ethernet),
+             "sender: eth3")
+    s.expect(PacketOutputEvent("eth0", reqpkt, display=Ethernet),
+             "receiver: eth0")
+
+    # 4->0
+    reqpkt = mk_pkt("20:00:00:00:00:04", "20:00:00:00:00:00")
+    s.expect(PacketInputEvent("eth4", reqpkt, display=Ethernet),
+             "sender: eth4")
+    s.expect(PacketOutputEvent("eth0", reqpkt, display=Ethernet),
+             "receiver: eth0")
+
+    # 5->6
+    reqpkt = mk_pkt("20:00:00:00:00:05", "20:00:00:00:00:06")
+    s.expect(PacketInputEvent("eth5", reqpkt, display=Ethernet),
+             "sender: eth5")
+    s.expect(PacketOutputEvent("eth0", reqpkt, "eth1", reqpkt, "eth2", reqpkt, "eth3", reqpkt, "eth4", reqpkt, "eth6",
+                               reqpkt, display=Ethernet),
+             "receiver: flooding")
+
+    # 3->4
+    reqpkt = mk_pkt("20:00:00:00:00:03", "20:00:00:00:00:04")
+    s.expect(PacketInputEvent("eth3", reqpkt, display=Ethernet),
+             "sender: eth3")
+    s.expect(PacketOutputEvent("eth4", reqpkt, display=Ethernet),
+             "receiver: eth4")
 
 scenario = switch_tests()

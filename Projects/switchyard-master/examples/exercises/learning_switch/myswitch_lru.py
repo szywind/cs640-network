@@ -44,6 +44,7 @@ def switchy_main(net):
             else:
                 forwardingTable[src_addr] = [id, input_port]
                 id += 1
+                # remove one entry
                 if len(forwardingTable) > size:
                     del forwardingTable[min(forwardingTable.items(), key=operator.itemgetter(1))[0]]
 
@@ -59,5 +60,7 @@ def switchy_main(net):
                 if input_port != intf.name:
                     log_debug ("Flooding packet {} to {}".format(packet, intf.name))
                     net.send_packet(intf.name, packet)
-
+        log_debug('---------------------------------------')
+        # temp = sorted(forwardingTable.items(), key=operator.itemgetter(1), reversed = True)
+        log_debug(forwardingTable.values())
     net.shutdown()
