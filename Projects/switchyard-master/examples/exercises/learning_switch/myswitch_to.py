@@ -45,6 +45,10 @@ def switchy_main(net):
                 net.send_packet(forwardingTable[dst_addr][0], packet)
             else:
                 del forwardingTable[dst_addr]
+                for intf in my_interfaces:
+                    if input_port != intf.name:
+                        log_debug("Flooding packet {} to {}".format(packet, intf.name))
+                        net.send_packet(intf.name, packet)
         else:
             for intf in my_interfaces:
                 if input_port != intf.name:
