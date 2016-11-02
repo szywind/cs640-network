@@ -96,17 +96,52 @@ class Router(object):
                 maxLength = prefixnet.prefixlen
         return ans
 
-    def forwarding(self, pkt):
+    def forwarding(self, pkt, input_port):
         ippkt = pkt.get_header(IPv4)
 
         ## decrease TTL
         ippkt.ttl -= 1
 
+        if ippkt.ttl <= 0:
+            ## Error handling. After decrementing an IP packet's TTL value as part of the forwarding process, the TTL becomes zero.
+            # i = pkt.get_header_index(Ethernet)
+            # del pkt[i]
+            #
+            # ip = IPv4()
+            # ip.protocol = IPProtocol.ICMP
+            # ip.srcip = ippkt.dstip
+            # ip.dstip = ippkt.srcip
+            # ip.ttl = 32
+            #
+            # icmp = ICMP()
+            # icmp.icmptype = ICMPType.TimeExceeded
+            # icmp.icmpcode = ICMPTypeCodeMap[icmp.icmptype].TTLExpired
+            # icmp.icmpdata.data = pkt.to_bytes()[:28]
+            # errMsgPkt = ip + icmp
+            # self.net.send_packet(input_port, errMsgPkt)
+            return
+
         ## lookup forward table
         fwd_info = self.lookupFT(ippkt.dstip)
         if fwd_info is None:
-            ## 1. If there is no match in the table, just drop the packet.
+            ## Error handling. 1. If there is no match in the table.
+            # i = pkt.get_header_index(Ethernet)
+            # del pkt[i]
+            #
+            # ip = IPv4()
+            # ip.protocol = IPProtocol.ICMP
+            # ip.srcip = ippkt.dstip
+            # ip.dstip = ippkt.srcip
+            # ip.ttl = 32
+            #
+            # icmp = ICMP()
+            # icmp.icmptype = ICMPType.DestinationUnreachable
+            # icmp.icmpcode = ICMPTypeCodeMap[icmp.icmptype].NetworkUnreachable
+            # icmp.icmpdata.data = pkt.to_bytes()[:28]
+            # errMsgPkt = ip + icmp
+            # self.net.send_packet(input_port, errMsgPkt)
             return
+
 
         if fwd_info[2] is None:
             ## next hop is the dst host
@@ -135,9 +170,9 @@ class Router(object):
                 self.net.send_packet(nextHopThruPortName, arpReqArp)
 
                 ## put this waiting ARP into queue
-                self.queue.append((WaitingARP(), nextHopThruPort, nextHopIP, [pkt]))
+                self.queue.append((WaitingARP(), nextHopThruPort, nextHopIP, [(pkt, input_port)]))
             else:
-                self.queue[unkownHostIP.index(nextHopIP)][-1].append(pkt)
+                self.queue[unkownHostIP.index(nextHopIP)][-1].append((pkt, input_port))
 
 
 
@@ -192,7 +227,7 @@ class Router(object):
                             if str(nextHopIP2) == str(nextHopIP):
                                 curTime = time.time()
                                 if arp_i.isValid(curTime) and not arp_i.isTimeout(curTime):
-                                    for fwdpkt in oldfwdpkts:
+                                    for (fwdpkt, _) in oldfwdpkts:
                                         ether = fwdpkt.get_header(Ethernet)
                                         ether.src = EthAddr(nextHopThruPort.ethaddr)
                                         ether.dst = EthAddr(nextHopMAC)
@@ -208,32 +243,50 @@ class Router(object):
                     if not ippkt is None:
                         try:
                             port = self.net.interface_by_ipaddr(ippkt.dstip)
-                            # if ippkt.protocol != IPProtocol.ICMP or icmppkt is None:
-                            #     ## 2. If packet is for the router itself (i.e., destination address is an address of one of the router's interfaces), also drop/ignore the packet.
-                            #     pass
-                            # elif icmppkt.icmptype == ICMPType.EchoRequest:
-                            #     ## construct an ICMP echo reply and send it back to the original host.
-                            #     etherSender = pkt.get_header(Ethernet)
-                            #     ether = Ethernet()
-                            #     ether.src = port.ethaddr
-                            #     ether.dst = etherSender.src
-                            #     ether.ethertype = EtherType.IPv4
-                            #
-                            #     ip = IPv4()
-                            #     ip.srcip = port.ipaddr
-                            #     ip.dstip = ippkt.srcip
-                            #     ip.protocol = IPProtocol.ICMP
-                            #     ip.ttl = 32
-                            #
-                            #     icmp = ICMP()
-                            #     icmp.icmptype = ICMPType.EchoReply
-                            #     icmp.icmpdata = icmppkt.icmpdata
-                            #
-                            #     echoReplyPkt = ether + ip + icmp
-                            #     self.forwarding(echoReplyPkt)
+                            if ippkt.protocol != IPProtocol.ICMP or icmppkt is None:
+                                ## 2. If packet is for the router itself (i.e., destination address is an address of one of the router's interfaces), also drop/ignore the packet.
+                                pass
+                            elif icmppkt.icmptype == ICMPType.EchoRequest:
+                                ## construct an ICMP echo reply and send it back to the original host.
 
+                                etherSender = pkt.get_header(Ethernet)
+                                ether = Ethernet()
+                                ether.src = port.ethaddr
+                                ether.dst = etherSender.src
+                                ether.ethertype = EtherType.IPv4
+
+                                ip = IPv4()
+                                ip.srcip = port.ipaddr
+                                ip.dstip = ippkt.srcip
+                                ip.protocol = IPProtocol.ICMP
+                                ip.ttl = 32
+
+                                icmp = ICMP()
+                                icmp.icmptype = ICMPType.EchoReply
+                                icmp.icmpdata = icmppkt.icmpdata
+
+                                echoReplyPkt = ether + ip + icmp
+
+                                # self.forwarding(echoReplyPkt)
+                            else:
+                                ## Error handling. The only packets destined for the router itself that it knows how to handle are ICMP echo requests.
+                                i = pkt.get_header_index(Ethernet)
+                                del pkt[i]
+
+                                ip = IPv4()
+                                ip.protocol = IPProtocol.ICMP
+                                ip.srcip = port.ipaddr
+                                ip.dstip = ippkt.srcip
+                                ip.ttl = 32
+
+                                icmp = ICMP()
+                                icmp.icmptype = ICMPType.DestinationUnreachable
+                                icmp.icmpcode = ICMPTypeCodeMap[icmp.icmptype].PortUnreachable
+                                icmp.icmpdata.data = pkt.to_bytes()[:28]
+                                errMsgPkt = ip + icmp
+                            #     self.forwarding(errMsgPkt, input_port)
                         except SwitchyException:
-                            self.forwarding(pkt)
+                            self.forwarding(pkt, input_port)
                 # debugger()
             ## maintain the waiting ARP queue
             for (arp_i, nextHopThruPort, nextHopIP, _) in self.queue:
@@ -252,7 +305,32 @@ class Router(object):
 
             ## drop ARP pkt after retrying 5 times w/o receiving ARP response
             curTime = time.time()
-            self.queue = [item_j for item_j in self.queue if item_j[0].isValid(curTime)]
+            # self.queue = [item_j for item_j in self.queue if item_j[0].isValid(curTime)]
+            new_queue = []
+            for item_j in self.queue:
+                if item_j[0].isValid(curTime):
+                    new_queue.append(item_j)
+                else:
+                    # Error handling. ARP Failure.
+                    # for (cached_pkt, cached_port) in item_j[3]:
+                    #     oldippkt = cached_pkt.get_header(IPv4)
+                    #     i = cached_pkt.get_header_index(Ethernet)
+                    #     del cached_pkt[i]
+                    #
+                    #     ip = IPv4()
+                    #     ip.protocol = IPProtocol.ICMP
+                    #     ip.srcip = oldippkt.dstip
+                    #     ip.dstip = oldippkt.srcip
+                    #     ip.ttl = 32
+                    #
+                    #     icmp = ICMP()
+                    #     icmp.icmptype = ICMPType.DestinationUnreachable
+                    #     icmp.icmpcode = ICMPTypeCodeMap[icmp.icmptype].HostUnreachable
+                    #     icmp.icmpdata.data = cached_pkt.to_bytes()[:28]
+                    #     errMsgPkt = ip + icmp
+                    #     self.net.send_packet(cached_port, errMsgPkt)
+                    pass
+            self.queue = new_queue
 
 def switchy_main(net):
     '''
