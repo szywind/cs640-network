@@ -43,7 +43,7 @@ def mk_pkt(etherType, hwsrc, ipsrc, ipdst, hwdst='ff:ff:ff:ff:ff:ff', reply=Fals
         arp.targetprotoaddr = IPAddr(ipdst)
         return ether + arp
 
-    elif etherType == EtherType.IP:
+    elif etherType == EtherType.IPv4:
         ippkt = IPv4()
         ippkt.srcip = IPAddr(ipsrc)
         ippkt.dstip = IPAddr(ipdst)
@@ -90,15 +90,15 @@ def router_tests():
 
 def case_1(s):
     # case 1: send non ARP request.
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '192.168.1.1', '10:00:00:00:00:01')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '192.168.1.1', '10:00:00:00:00:01')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "An ICMP request should arrive on router-eth0")
     s.expect(PacketInputTimeoutEvent(1.0), "No ARP reply")
 
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '192.168.1.1')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '192.168.1.1')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "An ICMP request should arrive on router-eth0")
     s.expect(PacketInputTimeoutEvent(1.0), "No ARP reply")
 
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '192.168.1.1', '10:00:00:00:00:02')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '192.168.1.1', '10:00:00:00:00:02')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "An ICMP request should arrive on router-eth0")
     s.expect(PacketInputTimeoutEvent(1.0), "No ARP reply")
 
@@ -124,19 +124,19 @@ def case_3(s):
 ## -----------------------------------------------------------------------------------------------------------
 def case_4(s):
     # case 4: send packet to the router itself
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '100.1.220.2')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '100.1.220.2')
     s.expect(PacketInputEvent("router-eth1", testPkt, display=Ethernet), "IP packet to '100.1.192.2' should arrive on router-eth1")
     s.expect(PacketInputTimeoutEvent(1.0), "The packet should be dropped")
 
 def case_5(s):
     # case 5: if there is no match in the table, just drop the packet.
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '111.1.220.2')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '111.1.220.2')
     s.expect(PacketInputEvent("router-eth1", testPkt, display=Ethernet), "IP packet to '111.1.192.2' should arrive on router-eth1")
     s.expect(PacketInputTimeoutEvent(1.0), "The packet should be dropped")
 
 def case_6(s):
     # case 6: forward to direct host
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '100.1.230.55', '30:00:00:00:05:01')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '100.1.230.55', '30:00:00:00:05:01')
     s.expect(PacketInputEvent("router-eth1", testPkt, display=Ethernet), "IP packet to '100.1.230.55' should arrive on router-eth1")
 
     arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.55')
@@ -151,7 +151,7 @@ def case_6(s):
 def case_7(s):
     # case 7: forward to indirect host through other routers with ARP if necessary
     # and if the dst. MAC is in the IP/MAC table, it will not send ARP again.
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '172.16.128.40', '66:66:66:66:66:66')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '172.16.128.40', '66:66:66:66:66:66')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "IP packet to '172.16.128.40' should arrive on router-eth0")
 
     arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:02', '100.1.220.1', '10.10.0.254') # '10.10.0.254' is next hop
@@ -174,10 +174,10 @@ def case_7(s):
 
 def case_8(s):
     # case 8: resend ARP request after 1.0s timeout
-    testPkt = mk_pkt(EtherType.IP, '30:00:00:00:00:01', '192.168.1.100', '172.16.0.0', '88:88:88:88:88:88')
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '172.16.0.0', '88:88:88:88:88:88')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "IP packet to '172.16.0.0' should arrive on router-eth0")
 
-    for i in range(5):
+    for i in range(3):
         arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:01', '192.168.1.1', '192.168.1.2')  # '192.168.1.2' is next hop
         s.expect(PacketOutputEvent("router-eth0", arpReqPkt, display=Ethernet), "ARP request from router-eth0")
 
