@@ -82,7 +82,7 @@ def router_tests():
     s.add_interface('router-eth2', '10:00:00:00:00:03', '100.1.220.2', '255.255.192.0')
     # s.add_interface('eth3', '10:00:00:00:00:04', '123.15.103.12', '255.255.255.128')
 
-    test_item_1(s)
+    # test_item_1(s)
     test_item_2_3(s)
 
     return s
@@ -177,7 +177,7 @@ def case_8(s):
     testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '172.16.0.0', '88:88:88:88:88:88')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "IP packet to '172.16.0.0' should arrive on router-eth0")
 
-    for i in range(5):
+    for i in range(6):
         arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:01', '192.168.1.1', '192.168.1.2')  # '192.168.1.2' is next hop
         s.expect(PacketOutputEvent("router-eth0", arpReqPkt, display=Ethernet), "ARP request from router-eth0")
 
@@ -193,10 +193,10 @@ def test_item_1(s):
     case_3(s)
 
 def test_item_2_3(s):
-    case_4(s)
-    case_5(s)
-    case_6(s)
-    case_7(s)
+    # case_4(s)
+    # case_5(s)
+    # case_6(s)
+    # case_7(s)
     case_8(s)
 
 
