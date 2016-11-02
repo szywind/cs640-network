@@ -13,46 +13,46 @@ from switchyard.lib.common import *
 
 # os.chdir("./Projects/switchyard-master/examples/exercises/router")
 
-# def mk_pkt(etherType, hwsrc, ipsrc, ipdst, hwdst='ff:ff:ff:ff:ff:ff', reply=False):
-#     '''
-#     :param etherType: etherType
-#     :param hwsrc: source MAC address
-#     :param ipsrc: source IP address
-#     :param ipdst: target IP address
-#     :param hwdst: target MAC address
-#     :param reply: flag to specify arp operation direction
-#     :return:
-#     '''
-#     ether = Ethernet()
-#     ether.src = EthAddr(hwsrc)
-#     ether.dst = EthAddr(hwdst)
-#     ether.ethertype = etherType
-#
-#     if etherType == EtherType.ARP:
-#         arp = Arp()
-#         if reply:
-#             arp.operation = ArpOperation.Reply
-#         else:
-#             arp.operation = ArpOperation.Request
-#         arp.senderhwaddr = EthAddr(hwsrc)
-#         arp.senderprotoaddr = IPAddr(ipsrc)
-#         arp.targethwaddr = EthAddr(hwdst)
-#         arp.targetprotoaddr = IPAddr(ipdst)
-#         return ether + arp
-#
-#     elif etherType == EtherType.IP:
-#         ippkt = IPv4()
-#         ippkt.srcip = IPAddr(ipsrc)
-#         ippkt.dstip = IPAddr(ipdst)
-#         ippkt.protocol = IPProtocol.ICMP
-#         ippkt.ttl = 32
-#
-#         icmppkt = ICMP()
-#         if reply:
-#             icmppkt.icmptype = ICMPType.EchoReply
-#         else:
-#             icmppkt.icmptype = ICMPType.EchoRequest
-#         return ether + ippkt + icmppkt
+def mk_pkt(etherType, hwsrc, ipsrc, ipdst, hwdst='ff:ff:ff:ff:ff:ff', reply=False):
+    '''
+    :param etherType: etherType
+    :param hwsrc: source MAC address
+    :param ipsrc: source IP address
+    :param ipdst: target IP address
+    :param hwdst: target MAC address
+    :param reply: flag to specify arp operation direction
+    :return:
+    '''
+    ether = Ethernet()
+    ether.src = EthAddr(hwsrc)
+    ether.dst = EthAddr(hwdst)
+    ether.ethertype = etherType
+
+    if etherType == EtherType.ARP:
+        arp = Arp()
+        if reply:
+            arp.operation = ArpOperation.Reply
+        else:
+            arp.operation = ArpOperation.Request
+        arp.senderhwaddr = EthAddr(hwsrc)
+        arp.senderprotoaddr = IPAddr(ipsrc)
+        arp.targethwaddr = EthAddr(hwdst)
+        arp.targetprotoaddr = IPAddr(ipdst)
+        return ether + arp
+
+    elif etherType == EtherType.IPv4:
+        ippkt = IPv4()
+        ippkt.srcip = IPAddr(ipsrc)
+        ippkt.dstip = IPAddr(ipdst)
+        ippkt.protocol = IPProtocol.ICMP
+        ippkt.ttl = 32
+
+        icmppkt = ICMP()
+        if reply:
+            icmppkt.icmptype = ICMPType.EchoReply
+        else:
+            icmppkt.icmptype = ICMPType.EchoRequest
+        return ether + ippkt + icmppkt
 
 # def parseLine(line):
 #     ans = (lambda x: x.strip().split(' '))(line)
@@ -140,48 +140,41 @@ class Router(object):
     def forwarding(self, pkt):
         ippkt = pkt.get_header(IPv4)
 
-        if not ippkt is None:
+        ## decrease TTL
+        ippkt.ttl -= 1
 
-            try:
-                ## 2. If packet is for the router itself (i.e., destination address is an address of one of the router's interfaces), also drop/ignore the packet.
-                self.net.interface_by_ipaddr(ippkt.dstip)
-                return
-            except SwitchyException:
-                ## decrease TTL
-                ippkt.ttl -= 1
+        ## lookup forward table
+        fwd_info = self.lookupFT(ippkt.dstip)
+        if fwd_info is None:
+            ## 1. If there is no match in the table, just drop the packet.
+            return
 
-                ## lookup forward table
-                fwd_info = self.lookupFT(ippkt.dstip)
-                if fwd_info is None:
-                    ## 1. If there is no match in the table, just drop the packet.
-                    return
+        if fwd_info[2] is None:
+            ## next hop is the dst host
+            nextHopIP = ippkt.dstip
+        else:
+            ## next hop is another router
+            nextHopIP = IPv4Address(fwd_info[2])   # assert(dstIP is not None)
 
-                if fwd_info[2] is None:
-                    ## next hop is the dst host
-                    nextHopIP = ippkt.dstip
-                else:
-                    ## next hop is another router
-                    nextHopIP = IPv4Address(fwd_info[2])   # assert(dstIP is not None)
+        nextHopThruPortName = fwd_info[3]
+        nextHopThruPort = self.net.interface_by_name(nextHopThruPortName)
 
-                nextHopThruPortName = fwd_info[3]
-                nextHopThruPort = self.net.interface_by_name(nextHopThruPortName)
+        if nextHopIP in self.ipMacTable:
+            ## lookup the dst. MAC
+            nextHopMAC =  self.ipMacTable[nextHopIP]
 
-                if nextHopIP in self.ipMacTable:
-                    ## lookup the dst. MAC
-                    nextHopMAC =  self.ipMacTable[nextHopIP]
+            ether = pkt.get_header(Ethernet)
+            ether.src = EthAddr(nextHopThruPort.ethaddr)
+            ether.dst = EthAddr(nextHopMAC)
+            fwdpkt = pkt
+            self.net.send_packet(nextHopThruPortName, fwdpkt)
+        else:
+            ## send ARP request
+            arpReqArp = create_ip_arp_request(nextHopThruPort.ethaddr, nextHopThruPort.ipaddr, nextHopIP)
+            self.net.send_packet(nextHopThruPortName, arpReqArp)
 
-                    ether = pkt.get_header(Ethernet)
-                    ether.src = EthAddr(nextHopThruPort.ethaddr)
-                    ether.dst = EthAddr(nextHopMAC)
-                    fwdpkt = pkt
-                    self.net.send_packet(nextHopThruPortName, fwdpkt)
-                else:
-                    ## send ARP request
-                    arpReqArp = create_ip_arp_request(nextHopThruPort.ethaddr, nextHopThruPort.ipaddr, nextHopIP)
-                    self.net.send_packet(nextHopThruPortName, arpReqArp)
-
-                    ## put this waiting ARP into queue
-                    self.queue.append((WaitingARP(), nextHopThruPort, nextHopIP, pkt))
+            ## put this waiting ARP into queue
+            self.queue.append((WaitingARP(), nextHopThruPort, nextHopIP, pkt))
 
 
 
@@ -247,8 +240,39 @@ class Router(object):
 
                 ## Receive IP packet
                 else:
-                    assert pkt.get_header(Ethernet).ethertype == EtherType.IP
-                    self.forwarding(pkt)
+                    assert pkt.get_header(Ethernet).ethertype == EtherType.IPv4
+
+                    ippkt = pkt.get_header(IPv4)
+                    icmppkt = pkt.get_header(ICMP)
+                    if not ippkt is None:
+                        try:
+                            port = self.net.interface_by_ipaddr(ippkt.dstip)
+                            # if ippkt.protocol != IPProtocol.ICMP or icmppkt is None:
+                            #     ## 2. If packet is for the router itself (i.e., destination address is an address of one of the router's interfaces), also drop/ignore the packet.
+                            #     pass
+                            # elif icmppkt.icmptype == ICMPType.EchoRequest:
+                            #     ## construct an ICMP echo reply and send it back to the original host.
+                            #     etherSender = pkt.get_header(Ethernet)
+                            #     ether = Ethernet()
+                            #     ether.src = port.ethaddr
+                            #     ether.dst = etherSender.src
+                            #     ether.ethertype = EtherType.IPv4
+                            #
+                            #     ip = IPv4()
+                            #     ip.srcip = port.ipaddr
+                            #     ip.dstip = ippkt.srcip
+                            #     ip.protocol = IPProtocol.ICMP
+                            #     ip.ttl = 32
+                            #
+                            #     icmp = ICMP()
+                            #     icmp.icmptype = ICMPType.EchoReply
+                            #     icmp.icmpdata = icmppkt.icmpdata
+                            #
+                            #     echoReplyPkt = ether + ip + icmp
+                            #     self.forwarding(echoReplyPkt)
+
+                        except SwitchyException:
+                            self.forwarding(pkt)
                 # debugger()
             ## maintain the waiting ARP queue
             for (arp_i, nextHopThruPort, nextHopIP, _) in self.queue:
