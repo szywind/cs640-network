@@ -169,13 +169,16 @@ class Router(object):
             fwdpkt = pkt
             self.net.send_packet(nextHopThruPortName, fwdpkt)
         else:
-            ## send ARP request
-            arpReqArp = create_ip_arp_request(nextHopThruPort.ethaddr, nextHopThruPort.ipaddr, nextHopIP)
-            self.net.send_packet(nextHopThruPortName, arpReqArp)
+            unkownHostIP = [ip_i for (_, _, ip_i, _) in self.queue]
+            if nextHopIP not in unkownHostIP:
+                ## send ARP request
+                arpReqArp = create_ip_arp_request(nextHopThruPort.ethaddr, nextHopThruPort.ipaddr, nextHopIP)
+                self.net.send_packet(nextHopThruPortName, arpReqArp)
 
-            ## put this waiting ARP into queue
-            self.queue.append((WaitingARP(), nextHopThruPort, nextHopIP, pkt))
-
+                ## put this waiting ARP into queue
+                self.queue.append((WaitingARP(), nextHopThruPort, nextHopIP, [pkt]))
+            else:
+                self.queue[unkownHostIP.index(nextHopIP)][-1].append(pkt)
 
 
 
@@ -226,17 +229,16 @@ class Router(object):
                         nextHopMAC = arp.senderhwaddr
                         self.ipMacTable[nextHopIP] = nextHopMAC
 
-                        for (arp_i, nextHopThruPort, nextHopIP2, oldfwdpkt) in self.queue:
+                        for (arp_i, nextHopThruPort, nextHopIP2, oldfwdpkts) in self.queue:
                             if str(nextHopIP2) == str(nextHopIP):
                                 curTime = time.time()
                                 if arp_i.isValid(curTime) and not arp_i.isTimeout(curTime):
-
-                                    ether = oldfwdpkt.get_header(Ethernet)
-                                    ether.src = EthAddr(nextHopThruPort.ethaddr)
-                                    ether.dst = EthAddr(nextHopMAC)
-                                    fwdpkt = oldfwdpkt
-                                    self.net.send_packet(nextHopThruPort.name, fwdpkt)
-                                    arp_i.setInvalid()
+                                    for fwdpkt in oldfwdpkts:
+                                        ether = fwdpkt.get_header(Ethernet)
+                                        ether.src = EthAddr(nextHopThruPort.ethaddr)
+                                        ether.dst = EthAddr(nextHopMAC)
+                                        self.net.send_packet(nextHopThruPort.name, fwdpkt)
+                                        arp_i.setInvalid()
 
                 ## Receive IP packet
                 else:

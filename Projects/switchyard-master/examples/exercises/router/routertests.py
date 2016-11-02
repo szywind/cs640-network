@@ -177,7 +177,7 @@ def case_8(s):
     testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '172.16.0.0', '88:88:88:88:88:88')
     s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "IP packet to '172.16.0.0' should arrive on router-eth0")
 
-    for i in range(6):
+    for i in range(3):
         arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:01', '192.168.1.1', '192.168.1.2')  # '192.168.1.2' is next hop
         s.expect(PacketOutputEvent("router-eth0", arpReqPkt, display=Ethernet), "ARP request from router-eth0")
 
