@@ -13,47 +13,6 @@ from switchyard.lib.common import *
 
 # os.chdir("./Projects/switchyard-master/examples/exercises/router")
 
-def mk_pkt(etherType, hwsrc, ipsrc, ipdst, hwdst='ff:ff:ff:ff:ff:ff', reply=False):
-    '''
-    :param etherType: etherType
-    :param hwsrc: source MAC address
-    :param ipsrc: source IP address
-    :param ipdst: target IP address
-    :param hwdst: target MAC address
-    :param reply: flag to specify arp operation direction
-    :return:
-    '''
-    ether = Ethernet()
-    ether.src = EthAddr(hwsrc)
-    ether.dst = EthAddr(hwdst)
-    ether.ethertype = etherType
-
-    if etherType == EtherType.ARP:
-        arp = Arp()
-        if reply:
-            arp.operation = ArpOperation.Reply
-        else:
-            arp.operation = ArpOperation.Request
-        arp.senderhwaddr = EthAddr(hwsrc)
-        arp.senderprotoaddr = IPAddr(ipsrc)
-        arp.targethwaddr = EthAddr(hwdst)
-        arp.targetprotoaddr = IPAddr(ipdst)
-        return ether + arp
-
-    elif etherType == EtherType.IPv4:
-        ippkt = IPv4()
-        ippkt.srcip = IPAddr(ipsrc)
-        ippkt.dstip = IPAddr(ipdst)
-        ippkt.protocol = IPProtocol.ICMP
-        ippkt.ttl = 32
-
-        icmppkt = ICMP()
-        if reply:
-            icmppkt.icmptype = ICMPType.EchoReply
-        else:
-            icmppkt.icmptype = ICMPType.EchoRequest
-        return ether + ippkt + icmppkt
-
 # def parseLine(line):
 #     ans = (lambda x: x.strip().split(' '))(line)
 #     ipaddr = IPv4Address(ans[0])
