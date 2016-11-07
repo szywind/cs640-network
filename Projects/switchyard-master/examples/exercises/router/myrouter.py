@@ -103,29 +103,24 @@ class Router(object):
     def forwarding(self, pkt):
         ippkt = pkt.get_header(IPv4)
 
-        if ippkt.ttl <= 1:
-            ## Error handling. After decrementing an IP packet's TTL value as part of the forwarding process, the TTL becomes zero.
-            errMsgPkt = self.mk_icmp_reply_pkg(pkt, ICMPType.TimeExceeded,
-                                                 ICMPTypeCodeMap[ICMPType.TimeExceeded].TTLExpired)
-            # self.forwarding(errMsgPkt)
-            # return
-            pkt = errMsgPkt
-            ippkt = pkt.get_header(IPv4)
-
         ## lookup forward table
         fwd_info = self.lookupFT(ippkt.dstip)
+
         if fwd_info is None:
             ## Error handling. 1. If there is no match in the table.
-            errMsgPkt = self.mk_icmp_reply_pkg(pkt, ICMPType.DestinationUnreachable,
+            errMsgPkt = self.mk_icmp_error_pkg(pkt, ICMPType.DestinationUnreachable,
                                                  ICMPTypeCodeMap[ICMPType.DestinationUnreachable].NetworkUnreachable)
-            # ippkt = pkt.get_header(IPv4)
-            # ippkt.ttl -= 1
-            pkt = errMsgPkt
-            ippkt = pkt.get_header(IPv4)
-            fwd_info = self.lookupFT(ippkt.dstip)
-
-        ## decrease TTL
-        ippkt.ttl -= 1
+            self.forwarding(errMsgPkt)
+            return
+        else:
+            ## decrease TTL
+            ippkt.ttl -= 1
+            if ippkt.ttl <= 0:
+                ## Error handling. After decrementing an IP packet's TTL value as part of the forwarding process, the TTL becomes zero.
+                errMsgPkt = self.mk_icmp_error_pkg(pkt, ICMPType.TimeExceeded,
+                                                     ICMPTypeCodeMap[ICMPType.TimeExceeded].TTLExpired)
+                self.forwarding(errMsgPkt)
+                return
 
         if fwd_info[2] is None:
             ## next hop is the dst host
@@ -272,7 +267,7 @@ class Router(object):
                                 self.forwarding(echoReplyPkt)
                             else:
                                 ## Error handling. The only packets destined for the router itself that it knows how to handle are ICMP echo requests.
-                                errMsgPkt = self.mk_icmp_reply_pkg(pkt, ICMPType.DestinationUnreachable,
+                                errMsgPkt = self.mk_icmp_error_pkg(pkt, ICMPType.DestinationUnreachable,
                                                                      ICMPTypeCodeMap[ICMPType.DestinationUnreachable].PortUnreachable)
                                 self.forwarding(errMsgPkt)
                         except SwitchyException:
@@ -307,12 +302,12 @@ class Router(object):
                 else:
                     # Error handling. ARP Failure.
                     for cached_pkt in item_j[3]:
-                        errMsgPkt = self.mk_icmp_reply_pkg(cached_pkt, ICMPType.DestinationUnreachable,
+                        errMsgPkt = self.mk_icmp_error_pkg(cached_pkt, ICMPType.DestinationUnreachable,
                                                              ICMPTypeCodeMap[ICMPType.DestinationUnreachable].HostUnreachable)
                         self.forwarding(errMsgPkt)
             self.queue = new_queue
 
-    def mk_icmp_reply_pkg(self, pkt, icmptype, icmpcode):
+    def mk_icmp_error_pkg(self, pkt, icmptype, icmpcode):
         '''
         Error handling. (1) After decrementing an IP packet's TTL value as part of the forwarding process, the TTL becomes zero.
         (2) ARP Failure. (3) Error handling. The only packets destined for the router itself that it knows how to handle are ICMP echo requests.

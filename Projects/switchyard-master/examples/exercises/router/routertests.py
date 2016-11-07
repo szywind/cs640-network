@@ -75,6 +75,42 @@ def mk_fwd_pkt(pkt, hwsrc, hwdst):
 
     return fwdPkt
 
+
+def mk_icmp_error_pkg(pkt, icmptype, icmpcode, hwsrc, hwdst, ipsrc):
+    '''
+    Error handling. (1) After decrementing an IP packet's TTL value as part of the forwarding process, the TTL becomes zero.
+    (2) ARP Failure. (3) Error handling. The only packets destined for the router itself that it knows how to handle are ICMP echo requests.
+    (4) If there is no match in the forward table.
+    :param pkt: error packet
+    :param icmptype: ICMPType.TimeExceeded / DestinationUnreachable / DestinationUnreachable / DestinationUnreachable
+    :param icmpcode: ICMPTypeCodeMap[icmp.icmptype].TTLExpired / HostUnreachable / PortUnreachable / NetworkUnreachable
+    :return: ICMP error message package
+    '''
+    temp = copy.deepcopy(pkt)
+    ippkt = temp.get_header(IPv4)
+    i = temp.get_header_index(Ethernet)
+    del temp[i]
+
+    ether = Ethernet()
+    ether.src = EthAddr(hwsrc)
+    ether.dst = EthAddr(hwdst)
+    ether.ethertype = EtherType.IPv4
+
+    ip = IPv4()
+    ip.protocol = IPProtocol.ICMP
+    ip.srcip = IPv4Address(ipsrc)
+    ip.dstip = ippkt.srcip
+    ip.ttl = 32
+
+    icmp = ICMP()
+    icmp.icmptype = icmptype
+    icmp.icmpcode = icmpcode
+    icmp.icmpdata.data = temp.to_bytes()[:28]
+    errMsgPkt = ether + ip + icmp
+
+    return errMsgPkt
+
+
 def router_tests():
     s = Scenario("router tests")
     s.add_interface('router-eth0', '10:00:00:00:00:01', '192.168.1.1', '255.255.255.0')
@@ -82,8 +118,9 @@ def router_tests():
     s.add_interface('router-eth2', '10:00:00:00:00:03', '100.1.220.2', '255.255.192.0')
     # s.add_interface('eth3', '10:00:00:00:00:04', '123.15.103.12', '255.255.255.128')
 
-    # test_item_1(s)
+    test_item_1(s)
     test_item_2_3(s)
+    test_item_4_5(s)
 
     return s
 
@@ -136,17 +173,17 @@ def case_5(s):
 
 def case_6(s):
     # case 6: forward to direct host
-    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '100.1.230.55', '30:00:00:00:05:01')
-    s.expect(PacketInputEvent("router-eth1", testPkt, display=Ethernet), "IP packet to '100.1.230.55' should arrive on router-eth1")
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '100.1.230.66', '30:00:00:00:06:06')
+    s.expect(PacketInputEvent("router-eth1", testPkt, display=Ethernet), "IP packet to '100.1.230.66' should arrive on router-eth1")
 
-    arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.55')
+    arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.66')
     s.expect(PacketOutputEvent("router-eth2", arpReqPkt, display=Ethernet), "ARP request from router-eth2")
 
-    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:05:01', '100.1.230.55', '100.1.220.2', '10:00:00:00:00:03', True)
+    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:05:01', '100.1.230.66', '100.1.220.2', '10:00:00:00:00:03', True)
     s.expect(PacketInputEvent("router-eth2", arpRespPkt, display=Ethernet), "ARP respond to router-eth2")
 
     fwdPkt = mk_fwd_pkt(testPkt, '10:00:00:00:00:03', '30:00:00:00:05:01')
-    s.expect(PacketOutputEvent("router-eth2", fwdPkt, display=Ethernet), "Forward IP packet to '100.1.230.55'")
+    s.expect(PacketOutputEvent("router-eth2", fwdPkt, display=Ethernet), "Forward IP packet to '100.1.230.66'")
 
 def case_7(s):
     # case 7: forward to indirect host through other routers with ARP if necessary
@@ -185,20 +222,92 @@ def case_8(s):
 
     s.expect(PacketInputTimeoutEvent(1.0), "The waiting ARP should be dropped.")
 
+## -----------------------------------------------------------------------------------------------------------
+def case_9(s):
+    # case 9: icmp reply
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '100.1.230.55', '100.1.220.1', '10:00:00:00:00:02')
+    s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet),
+             "An ICMP request to '100.1.220.1'(interface of the router) arrive on router-eth0 and ICMP reply should be triggered.")
+
+    arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.55')
+    s.expect(PacketOutputEvent("router-eth2", arpReqPkt, display=Ethernet), "ARP request for '100.1.230.55' from router-eth2")
+
+    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:05:01', '100.1.230.55', '100.1.220.2', '10:00:00:00:00:03', True)
+    s.expect(PacketInputEvent("router-eth2", arpRespPkt, display=Ethernet), "ARP respond to router-eth2")
+
+    icmpReplyPkt = mk_pkt(EtherType.IPv4, '10:00:00:00:00:03', '100.1.220.1', '100.1.230.55', '30:00:00:00:05:01', True)
+    icmpReplyPkt.get_header(IPv4).ttl -= 1
+    s.expect(PacketOutputEvent("router-eth2", icmpReplyPkt, display=Ethernet), "ICMP respond to '100.1.230.55' via router-eth2")
+
+def case_10(s):
+    # case 10-1: error handling for TTL timeout
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '100.1.220.3', '99:99:99:99:99:99')
+    testPkt.get_header(IPv4).ttl = 1
+    s.expect(PacketInputEvent("router-eth0", testPkt, display=Ethernet), "An ICMP request to '100.1.220.3' should arrive on router-eth0.")
+
+    arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.56')
+    s.expect(PacketOutputEvent("router-eth2", arpReqPkt, display=Ethernet),
+             "ARP request for '100.1.230.56' from router-eth2")
+
+    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:10:01', '100.1.230.56', '100.1.220.2', '10:00:00:00:00:03', True)
+    s.expect(PacketInputEvent("router-eth2", arpRespPkt, display=Ethernet), "ARP respond to router-eth2")
+
+
+    temp = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '100.1.220.3', '99:99:99:99:99:99')
+    temp.get_header(IPv4).ttl = 0
+    errMsgPkt = mk_icmp_error_pkg(temp, ICMPType.TimeExceeded, ICMPTypeCodeMap[ICMPType.TimeExceeded].TTLExpired, '10:00:00:00:00:03', '30:00:00:00:10:01', '100.1.220.2')
+    errMsgPkt.get_header(IPv4).ttl -= 1
+    s.expect(PacketOutputEvent("router-eth2", errMsgPkt, display=ICMP), "ICMP error reply for TTL timeout via router-eth2")
+
+    # case 10-2: error handling for network unreachable (missing destination in forwarding table)
+    testPkt2 = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '9.9.9.9', '99:99:99:99:99:99')
+    s.expect(PacketInputEvent("router-eth0", testPkt2, display=Ethernet), "An ICMP request to '9.9.9.9' should arrive on router-eth0.")
+
+    errMsgPkt2 = mk_icmp_error_pkg(testPkt2, ICMPType.DestinationUnreachable, ICMPTypeCodeMap[ICMPType.DestinationUnreachable].NetworkUnreachable, '10:00:00:00:00:03', '30:00:00:00:10:01', '100.1.220.2')
+    errMsgPkt2.get_header(IPv4).ttl -= 1
+    s.expect(PacketOutputEvent("router-eth2", errMsgPkt2, display=ICMP), "ICMP error reply for network unreachable via router-eth2")
+
+    # case 10-3: error handling for port unreachable
+    testPkt3 = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '100.1.220.2', '10:00:00:00:00:03', True)
+
+    s.expect(PacketInputEvent("router-eth0", testPkt3, display=Ethernet), "An ICMP reply to '100.1.220.2' should arrive on router-eth0.")
+
+    errMsgPkt3 = mk_icmp_error_pkg(testPkt3, ICMPType.DestinationUnreachable, ICMPTypeCodeMap[ICMPType.DestinationUnreachable].PortUnreachable, '10:00:00:00:00:03', '30:00:00:00:10:01', '100.1.220.2')
+    errMsgPkt3.get_header(IPv4).ttl -= 1
+    s.expect(PacketOutputEvent("router-eth2", errMsgPkt3, display=ICMP), "ICMP error reply for port unreachable via router-eth2")
+
+
+    # case 10-4: error handling for ARP failure
+    testPkt4 = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '100.1.230.57', '99:99:99:99:99:99')
+    s.expect(PacketInputEvent("router-eth0", testPkt4, display=Ethernet), "IP packet to '100.1.230.57' should arrive on router-eth0")
+
+    for i in range(5):
+        arpReqPkt4 = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.57')
+        s.expect(PacketOutputEvent("router-eth2", arpReqPkt4, display=Ethernet), "ARP request from router-eth2")
+        s.expect(PacketInputTimeoutEvent(1.0), "Wait for 1.0 second")
+
+    temp = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '100.1.230.57', '99:99:99:99:99:99')
+    temp.get_header(IPv4).ttl = 31
+    errMsgPkt4 = mk_icmp_error_pkg(temp, ICMPType.DestinationUnreachable, ICMPTypeCodeMap[ICMPType.DestinationUnreachable].HostUnreachable, '10:00:00:00:00:03', '30:00:00:00:10:01', '100.1.220.2')
+    errMsgPkt4.get_header(IPv4).ttl -= 1
+    s.expect(PacketOutputEvent("router-eth2", errMsgPkt4, display=ICMP), "ICMP error reply for ARP failure via router-eth2")
 
 
 def test_item_1(s):
-    case_1(s)
+    # case_1(s)
     case_2(s)
     case_3(s)
 
 def test_item_2_3(s):
     # case_4(s)
     # case_5(s)
-    # case_6(s)
-    # case_7(s)
-    case_8(s)
+    case_6(s)
+    case_7(s)
+    # case_8(s)
 
+def test_item_4_5(s):
+    case_9(s)
+    case_10(s)
 
 
 scenario = router_tests()
