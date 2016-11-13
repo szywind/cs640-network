@@ -4,7 +4,6 @@
 Basic IPv4 router (static routing) in Python.
 '''
 
-import sys
 import os
 import time
 from switchyard.lib.packet import *
@@ -12,13 +11,6 @@ from switchyard.lib.address import *
 from switchyard.lib.common import *
 
 # os.chdir("./Projects/switchyard-master/examples/exercises/router")
-
-# def parseLine(line):
-#     ans = (lambda x: x.strip().split(' '))(line)
-#     ipaddr = IPv4Address(ans[0])
-#     mask = IPv4Address(ans[1])
-#     ans[0] = prefix = str(IPv4Address(int(ipaddr) & int(mask)))
-#     return ans
 
 class WaitingARP(object):
     def __init__(self, times = 4):
@@ -65,13 +57,10 @@ class Router(object):
         try:
             dir_path = os.path.dirname(os.path.realpath(__file__))
             with open(dir_path + "/forwarding_table.txt", "r") as fl:
-                # for line in fl:
-                #     item = line.strip().split(' ')
-                #     self.forwardTable[int(item[0]) & int(item[1])] = item[1:]
-                # self.tableForward = {[0]: (lambda x: x.strip().split(' '))(line)[1:] for line in fl}
-
-                # self.tableForward.extend(parseLine(line) for line in fl)
-                self.forwardTable.extend([(lambda x: x.strip().split(' '))(line) for line in fl])
+                for line in fl:
+                    x = line.strip().split()
+                    if len(x) == 4:
+                        self.forwardTable.append(x)
         except FileNotFoundError:
             pass
 
@@ -83,9 +72,6 @@ class Router(object):
 
                 prefix = IPv4Address(int(ipaddr) & int(netmask))
                 self.forwardTable.append([str(prefix), str(netmask), None, intf.name])
-
-                # assert int(ipaddr) == int(ipaddr) & int(netmask)
-                # self.forwardTable.append([str(ipaddr), str(netmask), None, intf.name])
 
     def lookupFT(self, ipaddr):
         destaddr = IPv4Address(ipaddr)
@@ -204,8 +190,7 @@ class Router(object):
                                 pass
 
                     ## Receive ARP reply packet
-                    else:
-                        assert arp.operation == ArpOperation.Reply
+                    elif arp.operation == ArpOperation.Reply:
 
                         # save the IP/Ethernet MAC pair
                         nextHopIP = arp.senderprotoaddr
@@ -229,10 +214,10 @@ class Router(object):
                                         ether.dst = EthAddr(nextHopMAC)
                                         self.net.send_packet(nextHopThruPort.name, fwdpkt)
                                         arp_i.setFinished()
-
+                    else:
+                        pass
                 ## Receive IP packet
-                else:
-                    assert pkt.get_header(Ethernet).ethertype == EtherType.IPv4
+                elif pkt.get_header(Ethernet).ethertype == EtherType.IPv4: # assert EtherType.IP == EtherType.IPv4
 
                     ippkt = pkt.get_header(IPv4)
                     icmppkt = pkt.get_header(ICMP)
@@ -242,16 +227,10 @@ class Router(object):
                             port = self.net.interface_by_ipaddr(ippkt.dstip)
                             if (ippkt.protocol == IPProtocol.ICMP) and (not icmppkt is None) and (icmppkt.icmptype == ICMPType.EchoRequest):
                                 ## construct an ICMP echo reply and send it back to the original host.
-
                                 etherSender = pkt.get_header(Ethernet)
-                                # ether = Ethernet()
-                                # ether.src = port.ethaddr
-                                # ether.dst = etherSender.src
-                                # ether.ethertype = EtherType.IPv4
-
                                 ip = IPv4()
                                 ip.srcip = port.ipaddr
-                                assert port.ipaddr == ippkt.dstip
+                                # assert port.ipaddr == ippkt.dstip
                                 ip.dstip = ippkt.srcip
                                 ip.protocol = IPProtocol.ICMP
                                 ip.ttl = 32
@@ -272,6 +251,8 @@ class Router(object):
                                 self.forwarding(errMsgPkt)
                         except SwitchyException:
                             self.forwarding(pkt)
+                else:
+                    pass
                 #debugger()
             ## maintain the waiting ARP queue
             for (arp_i, nextHopThruPort, nextHopIP, _) in self.queue:
