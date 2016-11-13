@@ -179,11 +179,24 @@ def case_6(s):
     arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:03', '100.1.220.2', '100.1.230.66')
     s.expect(PacketOutputEvent("router-eth2", arpReqPkt, display=Ethernet), "ARP request from router-eth2")
 
-    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:05:01', '100.1.230.66', '100.1.220.2', '10:00:00:00:00:03', True)
+    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:06:06', '100.1.230.66', '100.1.220.2', '10:00:00:00:00:03', True)
     s.expect(PacketInputEvent("router-eth2", arpRespPkt, display=Ethernet), "ARP respond to router-eth2")
 
-    fwdPkt = mk_fwd_pkt(testPkt, '10:00:00:00:00:03', '30:00:00:00:05:01')
+    fwdPkt = mk_fwd_pkt(testPkt, '10:00:00:00:00:03', '30:00:00:00:06:06')
     s.expect(PacketOutputEvent("router-eth2", fwdPkt, display=Ethernet), "Forward IP packet to '100.1.230.66'")
+
+    testPkt = mk_pkt(EtherType.IPv4, '30:00:00:00:00:01', '192.168.1.100', '100.1.190.66', '30:00:00:00:06:66')
+    s.expect(PacketInputEvent("router-eth1", testPkt, display=Ethernet),
+             "IP packet to '100.1.190.66' should arrive on router-eth1")
+
+    arpReqPkt = mk_pkt(EtherType.ARP, '10:00:00:00:00:02', '100.1.220.1', '100.1.190.66')
+    s.expect(PacketOutputEvent("router-eth1", arpReqPkt, display=Ethernet), "ARP request from router-eth2")
+
+    arpRespPkt = mk_pkt(EtherType.ARP, '30:00:00:00:06:66', '100.1.190.66', '100.1.220.1', '10:00:00:00:00:02', True)
+    s.expect(PacketInputEvent("router-eth1", arpRespPkt, display=Ethernet), "ARP respond to router-eth2")
+
+    fwdPkt = mk_fwd_pkt(testPkt, '10:00:00:00:00:02', '30:00:00:00:06:66')
+    s.expect(PacketOutputEvent("router-eth1", fwdPkt, display=Ethernet), "Forward IP packet to '100.1.190.66'")
 
 def case_7(s):
     # case 7: forward to indirect host through other routers with ARP if necessary
@@ -260,8 +273,8 @@ def case_10(s):
     s.expect(PacketOutputEvent("router-eth2", errMsgPkt, display=ICMP), "ICMP error reply for TTL timeout via router-eth2")
 
     # case 10-2: error handling for network unreachable (missing destination in forwarding table)
-    testPkt2 = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '9.9.9.9', '99:99:99:99:99:99')
-    s.expect(PacketInputEvent("router-eth0", testPkt2, display=Ethernet), "An ICMP request to '9.9.9.9' should arrive on router-eth0.")
+    testPkt2 = mk_pkt(EtherType.IPv4, '30:00:00:00:10:01', '100.1.230.56', '100.1.119.99', '99:99:99:99:99:99')
+    s.expect(PacketInputEvent("router-eth0", testPkt2, display=Ethernet), "An ICMP request to '100.1.119.99' should arrive on router-eth0.")
 
     errMsgPkt2 = mk_icmp_error_pkg(testPkt2, ICMPType.DestinationUnreachable, ICMPTypeCodeMap[ICMPType.DestinationUnreachable].NetworkUnreachable, '10:00:00:00:00:03', '30:00:00:00:10:01', '100.1.220.2')
     errMsgPkt2.get_header(IPv4).ttl -= 1
