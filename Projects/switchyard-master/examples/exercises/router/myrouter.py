@@ -167,6 +167,13 @@ class Router(object):
                 log_debug("Unkown nput port")
                 return
 
+            ackPkt = Ethernet() + IPv4() + UDP()
+            ackPkt += b'hello world'
+            ackPkt += bytes(10)
+            foo = ackPkt[3]
+            #ackPkt.get_header(RawPacketContents)
+            bar = foo.to_bytes()
+
             if gotpkt:
                 log_debug("Got a packet: {}".format(str(pkt)))
                 arp = pkt.get_header(Arp)
