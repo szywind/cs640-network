@@ -77,7 +77,7 @@ def switchy_main(net):
         Do other things here and send packet
         '''
         pkt[0].src = mymacs[0]
-        # pkt[0].dst = EthAddr('20:00:00:00:00:01')
+        pkt[0].dst = EthAddr('20:00:00:00:00:01')
         pkt[1].srcip = myips[0]
         pkt[1].dstip = IPv4Address(blasteeIP)
         pkt[2].srcport = 73
