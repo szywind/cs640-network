@@ -99,7 +99,12 @@ def switchy_main(net):
     LHS = 1
     RHS = 1
 
-    pktNotAcked = set()
+    pktNotAcked = []
+    startTime = time.time()
+    nRetransmit = 0
+    nTimeOut = 0
+    lenPktAll = 0
+    lenPktGood = 0
     lastTime = time.time()
 
     while True:
@@ -132,22 +137,38 @@ def switchy_main(net):
                     if LHS == start + SW:
                         assert len(pktNotAcked) == 0
                     lastTime = time.time()
+
+            if LHS == N+1 and len(pktNotAcked) == 0:
+                ## print status
+                totalTX = time.time() - startTime
+                log_debug("[{}, {}]".format(LHS, RHS))
+                print("Total transmission time(in seconds): ", totalTX)
+                print("Number of retransmitted packets: ", nRetransmit)
+                print("Number of course timeouts: ", nTimeOut)
+                print("Throughput(in Bps): ", lenPktAll/totalTX)
+                print("Goodput(in Bps): ", lenPktGood/totalTX)
+                break
         else:
             log_debug("Didn't receive anything")
 
-        if LHS == N+1 and len(pktNotAcked) == 0:
-            break
         ## send next packet
         if RHS - LHS + 1 <= SW and RHS <= N:
+            if RHS == 1:
+                lastTime = time.time()
             send_packet(RHS)
-            pktNotAcked.add(RHS)
+            pktNotAcked.append(RHS)
             RHS += 1
+            lenPktGood += L
+            lenPktAll += L
 
         ## check timeout
         if time.time() - lastTime >= timeout and len(pktNotAcked) > 0:
             ## resend all unacked packets
             for seqNumber in pktNotAcked:
                 send_packet(seqNumber)
+                nRetransmit += 1
+                lenPktAll += L
+            nTimeOut += 1
             lastTime = time.time()
 
         log_debug("--------------------------Status-----------------------------")
