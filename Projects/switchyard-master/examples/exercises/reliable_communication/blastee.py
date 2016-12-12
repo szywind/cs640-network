@@ -66,7 +66,7 @@ def switchy_main(net):
             ackPkt[1].protocol = IPProtocol.UDP
 
             ackPkt[0].src = mymacs[0]
-            # ackPkt[0].dst = '10:00:00:00:00:01'
+            ackPkt[0].dst = '10:00:00:00:00:01'
             ackPkt[1].srcip = myips[0]
             ackPkt[1].dstip = blasterIP
             ackPkt[2].srcport = 8
