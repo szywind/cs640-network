@@ -12,7 +12,7 @@ def switchy_main(net):
     mymacs = [intf.ethaddr for intf in my_intf]
     myips = [intf.ipaddr for intf in my_intf]
 
-    assert len(my_intf) == 1
+    # assert len(my_intf) == 1
 
     try:
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -71,7 +71,7 @@ def switchy_main(net):
             ackPkt[1].dstip = blasterIP
             ackPkt[2].srcport = 8
             ackPkt[2].dstport = 13
-            log_debug("size of pkg = {}".format(len(pkt._headers)))
+            log_debug("size of packet = {}".format(len(pkt._headers)))
             temp = pkt.get_header(RawPacketContents).to_bytes()
             seqNumber = int.from_bytes(temp[:4], 'big')
             log_debug("sequence number = {}".format(seqNumber))
@@ -87,7 +87,7 @@ def switchy_main(net):
                 payload = temp[6:14]
             ackPkt += payload
             log_debug("ackPkt = {}".format(ackPkt))
-            assert input_port_name == 'blastee-eth0'
+            # assert input_port_name == 'blastee-eth0'
             net.send_packet(input_port_name, ackPkt)
 
     net.shutdown()
