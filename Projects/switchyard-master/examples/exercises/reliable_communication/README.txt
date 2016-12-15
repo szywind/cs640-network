@@ -13,4 +13,4 @@ During the retransmissions:
 retransmission list to the current non-ACKed list and repeat the retransmission process.
 
 After retransmissions:
-Send next packet and update RHS if not violating the constraints and so on.
+Send next packet and update RHS, if it doesn't violate the SW constraints and so on.
